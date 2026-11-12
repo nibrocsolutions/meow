@@ -15,15 +15,15 @@ from dataclasses import dataclass
 UNKNOWN, CAT, MARK = 0, 1, 2
 
 COLOR_NAMES = (
-    "rose",
-    "apricot",
-    "butter",
-    "mint",
-    "aqua",
-    "periwinkle",
-    "lilac",
+    "pink",
     "peach",
-    "sage",
+    "yellow",
+    "lime",
+    "sky",
+    "blue",
+    "lilac",
+    "coral",
+    "mint",
 )
 
 # Attempts per seed salt. The search is deterministic: the same seed always

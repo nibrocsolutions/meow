@@ -1,5 +1,5 @@
 /* Region names match COLOR_NAMES in app/puzzle.py. */
-const COLOR_NAMES = ["rose", "apricot", "butter", "mint", "aqua", "periwinkle", "lilac", "peach", "sage"];
+const COLOR_NAMES = ["pink", "peach", "yellow", "lime", "sky", "blue", "lilac", "coral", "mint"];
 
 const app = document.getElementById("app");
 const state = {
@@ -134,17 +134,28 @@ function buzz(ok) {
 
 function catSvg(sleepy) {
   const eyes = sleepy
-    ? `<path d="M22 37 q4 4 8 0" fill="none" stroke="var(--paper)" stroke-width="2.2" stroke-linecap="round"/>
-       <path d="M34 37 q4 4 8 0" fill="none" stroke="var(--paper)" stroke-width="2.2" stroke-linecap="round"/>`
-    : `<circle class="cat-eye" cx="26" cy="36" r="2.1"/>
-       <circle class="cat-eye" cx="39" cy="36" r="2.1"/>
-       <path class="cat-eye" d="M32 40.2 L29.7 43 L34.3 43 Z"/>`;
-  return `<svg viewBox="0 0 64 64" aria-hidden="true">
-    <path class="cat-body" d="M15 31 L11 13 L27 25 Z"/>
-    <path class="cat-body" d="M49 31 L53 13 L37 25 Z"/>
-    <ellipse class="cat-body" cx="32" cy="38" rx="18" ry="15"/>
+    ? `<path d="M20 33 q6 4 11 0" fill="none" stroke="#3a2a22" stroke-width="2.2" stroke-linecap="round"/>
+       <path d="M33 33 q6 4 11 0" fill="none" stroke="#3a2a22" stroke-width="2.2" stroke-linecap="round"/>`
+    : `<ellipse cx="25.5" cy="33" rx="3.2" ry="3.6" fill="#3a2a22"/>
+       <ellipse cx="38.5" cy="33" rx="3.2" ry="3.6" fill="#3a2a22"/>
+       <circle cx="26.6" cy="31.8" r="1.15" fill="#fff"/>
+       <circle cx="39.6" cy="31.8" r="1.15" fill="#fff"/>`;
+  return `<svg class="cat-face" viewBox="0 0 64 64" aria-hidden="true">
+    <path fill="#f0a04a" d="M16 30 L8 12 Q20 16 26 28 Z"/>
+    <path fill="#f0a04a" d="M48 30 L56 12 Q44 16 38 28 Z"/>
+    <path fill="#f7c4cb" d="M17 28 L12 16 Q19 18 24 27 Z"/>
+    <path fill="#f7c4cb" d="M47 28 L52 16 Q45 18 40 27 Z"/>
+    <circle cx="32" cy="36" r="20" fill="#f6a84c"/>
+    <path d="M32 18 v8 M25 20 l3 7 M39 20 l-3 7" fill="none" stroke="#e08a32" stroke-width="2.1" stroke-linecap="round"/>
+    <ellipse cx="32" cy="43" rx="12" ry="9" fill="#fff8f2"/>
     ${eyes}
+    <path fill="#e58b86" d="M32 37.2 L29.4 41.2 H34.6 Z"/>
+    <path d="M32 41.4 q-4 3.2 -7 1 M32 41.4 q4 3.2 7 1" fill="none" stroke="#e58b86" stroke-width="1.3" stroke-linecap="round"/>
   </svg>`;
+}
+
+function xMark() {
+  return `<svg class="mark-x" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg>`;
 }
 
 function heartSvg(on) {
@@ -325,7 +336,7 @@ function helpScreen() {
         <li>Every column has exactly one cat.</li>
         <li>Two cats cannot touch, not even on a corner.</li>
       </ol>
-      <p>Tap a cell to mark it empty. Tap the mark to try a cat. A wrong cat costs a heart. You have three. Drag across cells to mark a line of empties.</p>
+      <p>Tap a cell to mark it with an X. Tap the X to try a cat. A wrong cat costs a heart. You have three. Slide along a row or down a column and the X marks follow your finger.</p>
       <p>A resting cat is given. It does not move. Shaded dots are cells the cats you already placed have ruled out.</p>
       <p>Hints explain the next forced step. They do not cost a heart. Undo takes back a tap, a drag, or a hint.</p>
       <p>On a keyboard, arrows move, space cycles a cell, <kbd>Z</kbd> undoes, and <kbd>H</kbd> hints.</p>
@@ -337,24 +348,34 @@ function helpScreen() {
 function playScreen() {
   const run = state.run;
   const hearts = Array.from({ length: run.max_hearts }, (_, index) => heartSvg(index < run.hearts)).join("");
+  const tier = `${run.difficulty || "level"} · ${run.size}×${run.size}`;
   return `
     <header class="play-top">
       <button class="ghost" data-action="leave">Home</button>
-      <h1>${esc(run.title)}</h1>
       <button class="ghost" data-action="menu" aria-label="Menu">Menu</button>
     </header>
-    <div class="status-row">
-      <div class="hearts" aria-label="${run.hearts} hearts left">${hearts}</div>
-      <div id="timer">${formatTime(shownElapsed())}</div>
-      <div aria-label="${run.placed} of ${run.needed} cats">${run.placed}/${run.needed}</div>
+    <p class="kicker">${esc(tier)}</p>
+    <div class="play-head">
+      <h1 class="play-title">${esc(run.title)}</h1>
+      <div class="pills">
+        <span class="pill hearts" aria-label="${run.hearts} hearts left">${hearts}</span>
+        <span class="pill" aria-label="${run.placed} of ${run.needed} cats">${catSvg(false)} ${run.placed}/${run.needed}</span>
+        <span class="pill" id="timer">${formatTime(shownElapsed())}</span>
+      </div>
     </div>
+    <p class="rule-line">One cat in every <strong>row</strong>, <strong>column</strong>, and <strong>color</strong>. Cats never touch, not even diagonally.</p>
     <div class="board-wrap">${boardHtml(run)}</div>
-    <p class="hint" aria-live="polite">${esc(state.hint || "Tap once to mark a cell. Tap again for a cat.")}</p>
-    <p class="toast" aria-live="assertive">${esc(state.toast || "")}</p>
+    <div class="hint-row">
+      ${catSvg(false)}
+      <div class="bubble">
+        <p class="hint" aria-live="polite">${esc(state.hint || "Tap for an X. Slide along a row or column and the X's follow your finger.")}</p>
+        <p class="toast" aria-live="assertive">${esc(state.toast || "")}</p>
+      </div>
+    </div>
     <div class="tools">
-      <button class="tool" data-action="undo" ${run.can_undo ? "" : "disabled"}>Undo</button>
-      <button class="tool" data-action="hint" ${run.status === "playing" ? "" : "disabled"}>Hint</button>
-      <button class="tool" data-action="restart" ${run.status === "won" ? "disabled" : ""}>Restart</button>
+      <button class="tool" data-action="undo" ${run.can_undo ? "" : "disabled"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8 H4 V4 M4.5 13 a8 8 0 1 0 2-6.5 L4 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Undo</button>
+      <button class="tool" data-action="hint" ${run.status === "playing" ? "" : "disabled"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6 M10 21h4 M12 3a6 6 0 0 0-3 11c.5.6 1 1.4 1 2h4c0-.6.5-1.4 1-2a6 6 0 0 0-3-11z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Hint</button>
+      <button class="tool" data-action="restart" ${run.status === "won" ? "disabled" : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12 a8 8 0 1 1-2.3-5.7 M20 4 v5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Restart</button>
     </div>
     ${state.menu ? menuSheet() : ""}
     ${run.status === "won" ? winSheet() : ""}
@@ -374,38 +395,53 @@ function boardHtml(run) {
       const region = run.regions[row * run.size + col];
       const name = COLOR_NAMES[region] || "color";
       let kind = "empty";
-      let inner = "";
+      let inner = `<span class="dot"></span>`;
       if (starters.has(key)) {
-        kind = "given cat";
+        kind = "given";
         inner = catSvg(true);
       } else if (cats.has(key)) {
         kind = "cat";
         inner = catSvg(false);
       } else if (marks.has(key)) {
-        kind = "marked empty";
-        inner = `<span class="mark">×</span>`;
-      } else if (shaded.has(key)) {
-        kind = "ruled out";
-        inner = `<span class="shade"></span>`;
+        kind = "mark";
+        inner = xMark();
       }
+      const ruled = shaded.has(key) && kind === "empty" ? " ruled" : "";
       const cursor = state.keys && state.cursor && state.cursor.row === row && state.cursor.col === col ? " cursor" : "";
       const shake = state.shake === key ? " shake" : "";
-      const edge = edgeShadow(run, row, col, region);
-      cells.push(`<button type="button" class="cell${cursor}${shake}" data-region="${region}" data-r="${row}" data-c="${col}" style="${edge}" aria-label="Row ${row + 1}, column ${col + 1}, ${esc(name)}, ${kind}">${inner}</button>`);
+      const edge = regionStyle(run, row, col, region);
+      const labelKind = kind === "mark" ? "marked empty" : kind === "given" ? "given cat" : kind === "cat" ? "cat" : ruled ? "ruled out" : "empty";
+      cells.push(`<button type="button" class="cell${ruled}${cursor}${shake}" data-kind="${kind}" data-region="${region}" data-r="${row}" data-c="${col}" style="${edge}" aria-label="Row ${row + 1}, column ${col + 1}, ${esc(name)}, ${labelKind}">${inner}</button>`);
     }
   }
-  return `<div class="board" style="grid-template-columns:repeat(${run.size},1fr)">${cells.join("")}</div>`;
+  return `<div class="board-card"><div class="board" style="grid-template-columns:repeat(${run.size},1fr)">${cells.join("")}</div></div>`;
 }
 
-function edgeShadow(run, row, col, region) {
+function regionStyle(run, row, col, region) {
   const size = run.size;
-  const differs = (r, c) => r < 0 || c < 0 || r >= size || c >= size || run.regions[r * size + c] !== region;
-  const parts = [];
-  if (differs(row - 1, col)) parts.push("inset 0 2px 0 var(--line)");
-  if (row === size - 1) parts.push("inset 0 -2px 0 var(--line)");
-  if (differs(row, col - 1)) parts.push("inset 2px 0 0 var(--line)");
-  if (col === size - 1) parts.push("inset -2px 0 0 var(--line)");
-  return parts.length ? `box-shadow:${parts.join(",")}` : "";
+  const same = (r, c) => r >= 0 && c >= 0 && r < size && c < size && run.regions[r * size + c] === region;
+  const up = same(row - 1, col);
+  const down = same(row + 1, col);
+  const left = same(row, col - 1);
+  const right = same(row, col + 1);
+  const radius = "22%";
+  const tl = !up && !left ? radius : "0";
+  const tr = !up && !right ? radius : "0";
+  const br = !down && !right ? radius : "0";
+  const bl = !down && !left ? radius : "0";
+  const color = `var(--c${region})`;
+  const gap = "6px";
+  const shadows = [];
+  if (right) shadows.push(`${gap} 0 0 0 ${color}`);
+  if (down) shadows.push(`0 ${gap} 0 0 ${color}`);
+  if (right && down) shadows.push(`${gap} ${gap} 0 0 ${color}`);
+  if (right) shadows.push("inset -1px 0 0 rgba(255,255,255,0.72)");
+  if (down) shadows.push("inset 0 -1px 0 rgba(255,255,255,0.55)");
+  const layers = [];
+  if (!right) layers.push("linear-gradient(to right, transparent 92%, rgba(0,0,0,0.14) 100%)");
+  if (!down) layers.push("linear-gradient(to bottom, transparent 86%, rgba(0,0,0,0.2) 100%)");
+  const image = layers.length ? `background-image:${layers.join(",")};` : "";
+  return `border-radius:${tl} ${tr} ${br} ${bl};box-shadow:${shadows.join(",")};${image}`;
 }
 
 function shadeSet(run, cats, starters) {
@@ -777,35 +813,102 @@ document.addEventListener("input", (event) => {
 
 let gesture = null;
 
+function cellFromPoint(x, y) {
+  const board = document.querySelector(".board");
+  if (!board || !state.run) return null;
+  const cells = board.querySelectorAll(".cell");
+  let best = null;
+  let bestDist = Infinity;
+  for (const cell of cells) {
+    const rect = cell.getBoundingClientRect();
+    const cx = Math.min(Math.max(x, rect.left), rect.right);
+    const cy = Math.min(Math.max(y, rect.top), rect.bottom);
+    const dist = Math.hypot(x - cx, y - cy);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = cell;
+    }
+  }
+  if (!best || bestDist > 36) return null;
+  return { row: Number(best.dataset.r), col: Number(best.dataset.c) };
+}
+
+function cellButton(row, col) {
+  return document.querySelector(`.board .cell[data-r="${row}"][data-c="${col}"]`);
+}
+
+function showSlideMark(row, col, on) {
+  const cell = cellButton(row, col);
+  if (!cell || cell.dataset.kind === "cat" || cell.dataset.kind === "given") return false;
+  if (on) {
+    if (cell.dataset.kind === "mark" && !cell.classList.contains("fresh-mark")) return false;
+    cell.dataset.kind = "mark";
+    cell.classList.add("fresh-mark");
+    cell.innerHTML = xMark();
+    return true;
+  }
+  cell.classList.remove("fresh-mark");
+  cell.dataset.kind = "empty";
+  cell.innerHTML = `<span class="dot"></span>`;
+  return true;
+}
+
+function applySlideSpan(span) {
+  for (const key of [...gesture.added]) {
+    if (span.has(key)) continue;
+    const [row, col] = key.split(",").map(Number);
+    showSlideMark(row, col, false);
+    gesture.added.delete(key);
+  }
+  for (const key of span) {
+    if (gesture.added.has(key)) continue;
+    const [row, col] = key.split(",").map(Number);
+    const cell = cellButton(row, col);
+    if (!cell || cell.dataset.kind === "cat" || cell.dataset.kind === "given" || cell.dataset.kind === "mark") continue;
+    if (showSlideMark(row, col, true)) gesture.added.add(key);
+  }
+}
+
 document.addEventListener("pointerdown", (event) => {
   const cell = event.target.closest(".cell");
   if (!cell || state.screen !== "play" || !state.run || state.run.status !== "playing" || state.busy) return;
   if (event.button !== 0) return;
   event.preventDefault();
+  if (cell.setPointerCapture) cell.setPointerCapture(event.pointerId);
   gesture = {
     row: Number(cell.dataset.r),
     col: Number(cell.dataset.c),
+    axis: null,
     moved: false,
-    cells: [],
-    seen: new Set(),
+    added: new Set(),
     pointer: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
   };
 });
 
 document.addEventListener("pointermove", (event) => {
   if (!gesture || event.pointerId !== gesture.pointer) return;
-  const element = document.elementFromPoint(event.clientX, event.clientY);
-  const cell = element && element.closest ? element.closest(".cell") : null;
-  if (!cell) return;
-  const row = Number(cell.dataset.r);
-  const col = Number(cell.dataset.c);
-  if (row === gesture.row && col === gesture.col) return;
-  gesture.moved = true;
-  const key = `${row},${col}`;
-  if (!gesture.seen.has(key)) {
-    gesture.seen.add(key);
-    gesture.cells.push([row, col]);
+  const hit = cellFromPoint(event.clientX, event.clientY);
+  if (!hit) return;
+  if (!gesture.axis) {
+    const dx = event.clientX - gesture.x;
+    const dy = event.clientY - gesture.y;
+    if (Math.hypot(dx, dy) < 12) return;
+    gesture.axis = Math.abs(dx) >= Math.abs(dy) ? "row" : "col";
+    gesture.moved = true;
   }
+  const span = new Set();
+  if (gesture.axis === "row") {
+    const start = Math.min(gesture.col, hit.col);
+    const end = Math.max(gesture.col, hit.col);
+    for (let col = start; col <= end; col += 1) span.add(`${gesture.row},${col}`);
+  } else {
+    const start = Math.min(gesture.row, hit.row);
+    const end = Math.max(gesture.row, hit.row);
+    for (let row = start; row <= end; row += 1) span.add(`${row},${gesture.col}`);
+  }
+  applySlideSpan(span);
 });
 
 async function finishGesture(event) {
@@ -814,9 +917,9 @@ async function finishGesture(event) {
   gesture = null;
   if (!state.run) return;
   if (done.moved) {
-    const start = `${done.row},${done.col}`;
-    if (!done.seen.has(start)) done.cells.unshift([done.row, done.col]);
-    await act(`/api/runs/${state.run.id}/marks`, { cells: done.cells });
+    if (done.added.size === 0) return;
+    const cells = [...done.added].map((key) => key.split(",").map(Number));
+    await act(`/api/runs/${state.run.id}/marks`, { cells });
     return;
   }
   state.pendingCell = [done.row, done.col];
@@ -824,8 +927,17 @@ async function finishGesture(event) {
   await act(`/api/runs/${state.run.id}/tap`, { row: done.row, col: done.col });
 }
 
+function cancelGesture() {
+  if (!gesture) return;
+  for (const key of gesture.added) {
+    const [row, col] = key.split(",").map(Number);
+    showSlideMark(row, col, false);
+  }
+  gesture = null;
+}
+
 document.addEventListener("pointerup", finishGesture);
-document.addEventListener("pointercancel", () => { gesture = null; });
+document.addEventListener("pointercancel", cancelGesture);
 
 document.addEventListener("keydown", async (event) => {
   if (state.screen !== "play" || !state.run || event.metaKey || event.ctrlKey || event.altKey) return;
