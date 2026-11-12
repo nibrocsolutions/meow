@@ -299,15 +299,20 @@ function homeScreen() {
       <button class="ghost" data-action="switch">${esc(home.player.name)}</button>
     </header>
     <p class="lede">One cat in every row, column, and color. Cats can't touch.</p>
+    <h2 class="section-title">Levels</h2>
+    <p class="fine blurb">${home.campaign_completed ? `Next is level ${next.level}, a different board from the one you just solved.` : "Start at level 1. Each number is a different board."}</p>
     <div class="stack">
       <button class="choice" data-action="campaign" data-level="${next.level}" data-replay="false">
         <strong>${playingCampaign ? "Continue" : "Play"} level ${next.level}</strong>
         <span>${esc(next.tier)} · ${next.size}×${next.size}${home.campaign_completed ? ` · ${home.campaign_completed} solved` : ""}</span>
       </button>
     </div>
+    <div class="level-grid">${levelButtons(homeLevelsAround(home))}</div>
     <h2 class="section-title">Today ${home.streak ? `· ${home.streak} day streak` : ""}</h2>
+    <p class="fine blurb">The same three boards until midnight. They are not level numbers, and playing one again repeats that board.</p>
     <div class="row">${daily}</div>
     <h2 class="section-title">Endless</h2>
+    <p class="fine blurb">A new board each time, with no level number.</p>
     <div class="row four">
       ${endlessButton("easy", "6×6")}
       ${endlessButton("normal", "7×7")}
@@ -315,7 +320,7 @@ function homeScreen() {
       ${endlessButton("expert", "9×9")}
     </div>
     <div class="stack">
-      <button class="choice" data-action="levels"><strong>Levels</strong><span>Replay one you already opened</span></button>
+      <button class="choice" data-action="levels"><strong>All levels</strong><span>Every number, including ones you already solved</span></button>
       <button class="choice" data-action="help"><strong>How to play</strong><span>Four rules, then the buttons</span></button>
       <button class="choice" data-action="stats"><strong>Stats</strong><span>${home.stats.solved} solved</span></button>
     </div>
@@ -339,21 +344,37 @@ function dailyLabel(item) {
   return `${item.size}×${item.size}`;
 }
 
-function levelsScreen() {
-  const buttons = state.home.levels.map((level) => `
+function homeLevelsAround(home) {
+  const start = Math.max(1, home.campaign_next - 1);
+  return home.levels.filter((level) => level.level >= start && level.level < start + 8);
+}
+
+function levelButtons(levels) {
+  return levels.map((level) => `
     <button class="${esc(level.status)}" data-action="campaign" data-level="${level.level}" data-replay="${level.status === "won" ? "true" : "false"}" ${level.status === "locked" ? "disabled" : ""}>
       <strong>${level.level}</strong>
       <small>${level.status === "won" && level.best_ms != null ? formatTime(level.best_ms) : esc(level.status === "locked" ? "locked" : level.tier)}</small>
     </button>
   `).join("");
+}
+
+function levelsScreen() {
   return `
     <header class="top">
       <button class="ghost" data-action="home">Home</button>
       <h1>Levels</h1>
       <span></span>
     </header>
-    <div class="level-grid" style="margin-top:16px">${buttons}</div>
+    <p class="fine blurb">Solve them in order. A number you already finished can be played again, and it is the same board.</p>
+    <div class="level-grid">${levelButtons(state.home.levels)}</div>
   `;
+}
+
+function nextCampaignLevel() {
+  const run = state.run;
+  if (run && run.mode === "campaign" && run.level) return run.level + 1;
+  if (state.home && state.home.campaign_next) return state.home.campaign_next;
+  return 1;
 }
 
 function statsScreen() {
@@ -388,6 +409,7 @@ function helpScreen() {
       <span></span>
     </header>
     <div class="card help-copy" style="padding:16px;margin-top:16px">
+      <p>Levels are numbered. Finish one and the next number is a different board. Today keeps the same three puzzles until midnight. Endless is a new board with no number.</p>
       <p>The board is split into colored regions. Place cats until every rule holds.</p>
       <ol class="rules">
         <li>Every color has exactly one cat.</li>
@@ -515,20 +537,22 @@ function menuSheet() {
 function winSheet() {
   const run = state.run;
   const best = run.is_best ? "Best time." : run.best_ms != null ? `Best is ${formatTime(run.best_ms)}.` : "";
-  let next = `<button class="primary" data-action="home">Home</button>`;
+  const level = nextCampaignLevel();
+  let again = "";
   if (run.mode === "campaign") {
-    next = `<button class="primary" data-action="campaign" data-level="${run.level + 1}" data-replay="false">Level ${run.level + 1}</button>`;
+    again = `<button class="text-button" data-action="campaign" data-level="${run.level}" data-replay="true">Replay level ${run.level}</button>`;
   } else if (run.mode === "endless") {
-    next = `<button class="primary" data-action="new-endless">Another ${esc(run.difficulty)}</button>`;
+    again = `<button class="text-button" data-action="new-endless">New ${esc(run.difficulty)} board</button>`;
   } else {
-    next = `<button class="primary" data-action="replay-daily">Play again</button>`;
+    again = `<button class="text-button" data-action="replay-daily">Repeat today's ${esc(run.difficulty)}</button>`;
   }
   return `
     <div class="overlay">
       <div class="sheet" data-stop>
         <h2>Solved</h2>
         <p>${formatTime(run.elapsed_ms)} · ${run.hints} ${run.hints === 1 ? "hint" : "hints"}. ${esc(best)}</p>
-        ${next}
+        <button class="primary" data-action="campaign" data-level="${level}" data-replay="false">Play level ${level}</button>
+        ${again}
         <button class="text-button" data-action="home">Home</button>
       </div>
     </div>

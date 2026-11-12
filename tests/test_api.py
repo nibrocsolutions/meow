@@ -127,6 +127,26 @@ def test_campaign_play_hearts_hint_and_win(client):
     assert body["stats"]["solved"] == 1
 
 
+def test_next_campaign_level_is_a_different_board(client):
+    player = _player(client, "Nia")
+    first = client.post("/api/runs", json={"player_id": player["id"], "mode": "campaign", "level": 1}).json()
+    current = first
+    for _ in range(40):
+        if current["status"] == "won":
+            break
+        current = client.post(
+            f"/api/runs/{current['id']}/hint",
+            json={"player_id": player["id"], "elapsed_ms": 1000},
+        ).json()
+    assert current["status"] == "won"
+    assert current["title"] == "Level 1"
+    second = client.post("/api/runs", json={"player_id": player["id"], "mode": "campaign", "level": 2}).json()
+    assert second["title"] == "Level 2"
+    assert second["id"] != first["id"]
+    assert second["regions"] != first["regions"]
+    assert second["status"] == "playing"
+
+
 def test_daily_is_stable_and_counts_toward_the_streak(client):
     player = _player(client)
     first = client.post("/api/runs", json={"player_id": player["id"], "mode": "daily", "difficulty": "easy"})
