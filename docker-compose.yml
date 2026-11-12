@@ -1,0 +1,18 @@
+services:
+  meow:
+    build: .
+    image: meow:latest
+    container_name: meow
+    ports:
+      - "8094:8094"
+    volumes:
+      - meow-data:/data
+    environment:
+      DATA_DIR: /data
+      PORT: "8094"
+      TZ: America/New_York
+      DAILY_TZ: America/New_York
+    restart: unless-stopped
+
+volumes:
+  meow-data:

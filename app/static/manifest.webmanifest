@@ -1,0 +1,17 @@
+{
+  "name": "Meow",
+  "short_name": "Meow",
+  "description": "Place one cat in every row, column, and color.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3ecdf",
+  "theme_color": "#f3ecdf",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
