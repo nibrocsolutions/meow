@@ -1,24 +1,25 @@
-/* Region colors stay in this order: rose, apricot, butter, mint, aqua,
-   periwinkle, lilac, peach, sage. Same order as COLOR_NAMES in app/puzzle.py. */
+/* Region colors stay in this order: pink, peach, yellow, lime, sky,
+   blue, lilac, coral, mint. Same order as COLOR_NAMES in app/puzzle.py. */
 
 :root {
-  --paper: #f3ecdf;
-  --ink: #241c15;
-  --muted: #6f6256;
-  --card: #fffaf3;
-  --line: #2c241c;
-  --heart: #c44536;
+  --paper: #eef0fb;
+  --ink: #2a2440;
+  --muted: #6d6780;
+  --card: #ffffff;
+  --line: #2a2440;
+  --heart: #e25b6a;
   --good: #1d7a4d;
-  --shadow: 0 12px 32px rgba(55, 36, 16, 0.08);
-  --c0: #f6c7c1;
-  --c1: #f8d7a8;
-  --c2: #f3e7a1;
-  --c3: #cfe8b8;
-  --c4: #b7e3e4;
-  --c5: #c9d4f6;
-  --c6: #e4c9f2;
-  --c7: #f7d2b8;
-  --c8: #d5e7cf;
+  --hint: #e07a2f;
+  --shadow: 0 12px 32px rgba(70, 60, 120, 0.1);
+  --c0: #f7b4d0;
+  --c1: #f8b56b;
+  --c2: #ffe56b;
+  --c3: #b6e56a;
+  --c4: #8fd4fb;
+  --c5: #b7c4fb;
+  --c6: #d7b6f8;
+  --c7: #f3a58a;
+  --c8: #7ed9c3;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: light;
@@ -26,23 +27,24 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #1b1612;
+    --paper: #17141f;
     --ink: #f6efe6;
     --muted: #cbbba8;
-    --card: #2a231c;
+    --card: #2a2438;
     --line: #f0e2d0;
-    --heart: #ff6d5c;
+    --heart: #ff6d7a;
     --good: #7dcea5;
+    --hint: #ffb067;
     --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-    --c0: #8d534d;
-    --c1: #8d6738;
-    --c2: #7d7042;
-    --c3: #4f6d46;
-    --c4: #3e6668;
-    --c5: #4c5788;
-    --c6: #6c4e78;
-    --c7: #8c5d42;
-    --c8: #51664e;
+    --c0: #c46b90;
+    --c1: #d4893f;
+    --c2: #e0c24a;
+    --c3: #7eae45;
+    --c4: #4e9ec4;
+    --c5: #6d7ec4;
+    --c6: #9a74c4;
+    --c7: #c46d55;
+    --c8: #3e9e88;
     color-scheme: dark;
   }
 }
@@ -265,25 +267,36 @@ body.playing #app {
   justify-content: center;
 }
 
+.board-card {
+  width: min(100%, 520px, max(200px, calc(100dvh - 300px)));
+  background: var(--card);
+  border-radius: 28px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
 .board {
-  width: min(100%, 520px, max(180px, calc(100dvh - 230px)));
+  width: 100%;
   aspect-ratio: 1;
   display: grid;
-  border-radius: 18px;
-  overflow: hidden;
+  gap: 6px;
+  border-radius: 0;
+  overflow: visible;
   touch-action: none;
   user-select: none;
-  box-shadow: var(--shadow);
-  background: var(--line);
+  background: var(--card);
+  box-shadow: none;
 }
 
 .cell {
   position: relative;
   padding: 0;
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0;
+  appearance: none;
+  touch-action: none;
 }
 
 .cell[data-region="0"] { background: var(--c0); }
@@ -296,22 +309,28 @@ body.playing #app {
 .cell[data-region="7"] { background: var(--c7); }
 .cell[data-region="8"] { background: var(--c8); }
 
-.cell svg, .wordmark svg { width: 68%; height: 68%; }
 .wordmark svg { width: 36px; height: 36px; }
-.cat-body { fill: var(--ink); }
-.cat-eye { fill: var(--paper); }
-.mark {
-  font-size: clamp(16px, 4.2vw, 28px);
-  font-weight: 600;
-  opacity: 0.72;
-  line-height: 1;
+.cell .cat-face { width: 74%; height: 74%; }
+.mark-x {
+  width: 52%;
+  height: 52%;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.12));
 }
-.shade {
-  width: 16%;
-  height: 16%;
+.cell.fresh-mark .mark-x { animation: pop 0.12s ease-out; }
+.dot {
+  width: 12%;
+  height: 12%;
   border-radius: 50%;
-  background: var(--ink);
-  opacity: 0.35;
+  background: rgba(42, 36, 64, 0.38);
+}
+@media (prefers-color-scheme: dark) {
+  .dot { background: rgba(255, 255, 255, 0.55); }
+}
+.cell.ruled .dot { opacity: 0.4; }
+
+@keyframes pop {
+  from { transform: scale(0.55); }
+  to { transform: scale(1); }
 }
 .cell.cursor { outline: 3px solid var(--ink); outline-offset: -4px; z-index: 1; }
 .cell.shake { animation: shake 0.35s linear; }
@@ -325,14 +344,86 @@ body.playing #app {
   .cell.shake { animation: none; }
 }
 
+.kicker {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.play-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.play-title {
+  margin: 0;
+  font-size: 1.7rem;
+  letter-spacing: -0.03em;
+}
+.pills {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.pill svg { width: 18px; height: 18px; }
+.rule-line {
+  margin: 8px 0 10px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.rule-line strong { color: var(--ink); font-weight: 750; }
+.hint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.hint-row > .cat-face { width: 40px; height: 40px; flex: none; }
+.bubble {
+  flex: 1;
+  min-width: 0;
+  background: var(--card);
+  border-radius: 18px;
+  padding: 8px 14px;
+  box-shadow: var(--shadow);
+}
+.bubble .hint, .bubble .toast { margin: 0; }
+.bubble .toast:empty, .bubble .hint:empty { display: none; }
 .tools { margin-top: 10px; }
 .tool {
   flex: 1;
-  min-height: 48px;
-  border-radius: 14px;
+  min-height: 64px;
+  border-radius: 18px;
   background: var(--card);
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 0 rgba(80, 60, 120, 0.06);
   font-weight: 650;
+  font-size: 0.78rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.tool svg { width: 22px; height: 22px; }
+.tool[data-action="hint"] {
+  color: var(--hint);
+  box-shadow: inset 0 0 0 2px #f0a05a, 0 4px 0 rgba(80, 60, 120, 0.04);
 }
 .tool:disabled { opacity: 0.4; }
 
