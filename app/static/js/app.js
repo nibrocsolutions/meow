@@ -20,6 +20,8 @@ const state = {
   rename: "",
   cursor: null,
   keys: false,
+  clockLive: false,
+  clockIntent: false,
 };
 
 function loadPrefs() {
@@ -53,8 +55,27 @@ function formatTime(ms) {
 
 function shownElapsed() {
   if (!state.run) return 0;
-  if (state.run.status !== "playing") return state.run.elapsed_ms;
+  if (state.run.status !== "playing" || !state.clockLive) return state.run.elapsed_ms;
   return state.run.elapsed_ms + (Date.now() - state.tickStart);
+}
+
+function boardChanged(previous, run) {
+  if (!previous || !run) return false;
+  const count = (list) => (list ? list.length : 0);
+  return count(previous.marks) !== count(run.marks)
+    || count(previous.cats) !== count(run.cats)
+    || previous.hints !== run.hints
+    || previous.hearts !== run.hearts
+    || previous.status !== run.status;
+}
+
+function hasStarted(run) {
+  if (!run) return false;
+  return run.elapsed_ms > 0
+    || (run.marks && run.marks.length > 0)
+    || (run.cats && run.cats.length > 0)
+    || run.hints > 0
+    || (typeof run.max_hearts === "number" && run.hearts < run.max_hearts);
 }
 
 async function api(path, options = {}) {
@@ -82,6 +103,22 @@ async function api(path, options = {}) {
 }
 
 function adopt(run) {
+  const previous = state.run;
+  const same = previous && previous.id === run.id;
+  const intent = state.clockIntent;
+  state.clockIntent = false;
+  const restarted = same && !hasStarted(run) && hasStarted(previous);
+  if (run.status !== "playing" || restarted) {
+    state.clockLive = false;
+  } else if (!same) {
+    state.clockLive = hasStarted(run);
+  } else if (intent) {
+    state.clockLive = boardChanged(previous, run);
+  } else if (state.clockLive || hasStarted(run)) {
+    state.clockLive = true;
+  } else {
+    state.clockLive = false;
+  }
   state.run = run;
   state.tickStart = Date.now();
   if (run.hint) state.hint = run.hint;
@@ -200,7 +237,29 @@ function render() {
   }
   if (state.screen === "play" && state.run) {
     app.innerHTML = playScreen();
+    sizeBoard();
   }
+}
+
+function sizeBoard() {
+  const board = document.querySelector(".board");
+  if (!board || !state.run) return;
+  const card = board.closest(".board-card");
+  const cardStyle = getComputedStyle(card);
+  const boardStyle = getComputedStyle(board);
+  const padX = parseFloat(cardStyle.paddingLeft) + parseFloat(cardStyle.paddingRight);
+  const gap = parseFloat(boardStyle.columnGap) || 0;
+  const count = state.run.size;
+  const room = Math.floor(card.clientWidth - padX);
+  const cell = Math.floor((room - gap * (count - 1)) / count);
+  if (cell < 8) return;
+  const span = cell * count + gap * (count - 1);
+  board.style.width = `${span}px`;
+  board.style.height = `${span}px`;
+  board.style.aspectRatio = "auto";
+  const track = `repeat(${count}, ${cell}px)`;
+  board.style.gridTemplateColumns = track;
+  board.style.gridTemplateRows = track;
 }
 
 function playerScreen() {
@@ -409,39 +468,12 @@ function boardHtml(run) {
       const ruled = shaded.has(key) && kind === "empty" ? " ruled" : "";
       const cursor = state.keys && state.cursor && state.cursor.row === row && state.cursor.col === col ? " cursor" : "";
       const shake = state.shake === key ? " shake" : "";
-      const edge = regionStyle(run, row, col, region);
       const labelKind = kind === "mark" ? "marked empty" : kind === "given" ? "given cat" : kind === "cat" ? "cat" : ruled ? "ruled out" : "empty";
-      cells.push(`<button type="button" class="cell${ruled}${cursor}${shake}" data-kind="${kind}" data-region="${region}" data-r="${row}" data-c="${col}" style="${edge}" aria-label="Row ${row + 1}, column ${col + 1}, ${esc(name)}, ${labelKind}">${inner}</button>`);
+      cells.push(`<button type="button" class="cell${ruled}${cursor}${shake}" data-kind="${kind}" data-region="${region}" data-r="${row}" data-c="${col}" aria-label="Row ${row + 1}, column ${col + 1}, ${esc(name)}, ${labelKind}">${inner}</button>`);
     }
   }
-  return `<div class="board-card"><div class="board" style="grid-template-columns:repeat(${run.size},1fr)">${cells.join("")}</div></div>`;
-}
-
-function regionStyle(run, row, col, region) {
-  const size = run.size;
-  const same = (r, c) => r >= 0 && c >= 0 && r < size && c < size && run.regions[r * size + c] === region;
-  const up = same(row - 1, col);
-  const down = same(row + 1, col);
-  const left = same(row, col - 1);
-  const right = same(row, col + 1);
-  const radius = "22%";
-  const tl = !up && !left ? radius : "0";
-  const tr = !up && !right ? radius : "0";
-  const br = !down && !right ? radius : "0";
-  const bl = !down && !left ? radius : "0";
-  const color = `var(--c${region})`;
-  const gap = "6px";
-  const shadows = [];
-  if (right) shadows.push(`${gap} 0 0 0 ${color}`);
-  if (down) shadows.push(`0 ${gap} 0 0 ${color}`);
-  if (right && down) shadows.push(`${gap} ${gap} 0 0 ${color}`);
-  if (right) shadows.push("inset -1px 0 0 rgba(255,255,255,0.72)");
-  if (down) shadows.push("inset 0 -1px 0 rgba(255,255,255,0.55)");
-  const layers = [];
-  if (!right) layers.push("linear-gradient(to right, transparent 92%, rgba(0,0,0,0.14) 100%)");
-  if (!down) layers.push("linear-gradient(to bottom, transparent 86%, rgba(0,0,0,0.2) 100%)");
-  const image = layers.length ? `background-image:${layers.join(",")};` : "";
-  return `border-radius:${tl} ${tr} ${br} ${bl};box-shadow:${shadows.join(",")};${image}`;
+  const track = `repeat(${run.size},minmax(0,1fr))`;
+  return `<div class="board-card"><div class="board" style="grid-template-columns:${track};grid-template-rows:${track}">${cells.join("")}</div></div>`;
 }
 
 function shadeSet(run, cats, starters) {
@@ -605,17 +637,27 @@ async function openRun(body, label) {
 async function act(path, extra = {}) {
   if (!state.run || state.busy) return;
   state.busy = true;
+  const mayStart = /\/(tap|marks|hint)$/.test(path);
+  const elapsed = Math.round(shownElapsed());
+  if (mayStart && !state.clockLive) {
+    state.clockIntent = true;
+    state.clockLive = true;
+    state.tickStart = Date.now();
+  }
   try {
     const run = await api(path, {
       method: "POST",
       body: JSON.stringify({
         player_id: state.player.id,
-        elapsed_ms: Math.round(shownElapsed()),
+        elapsed_ms: elapsed,
         ...extra,
       }),
     });
     adopt(run);
+    if (path.endsWith("/restart")) state.clockLive = false;
   } catch (error) {
+    if (state.clockIntent) state.clockLive = false;
+    state.clockIntent = false;
     flash(error.message);
   } finally {
     state.busy = false;
@@ -624,7 +666,7 @@ async function act(path, extra = {}) {
 }
 
 async function saveClock() {
-  if (!state.run || state.run.status !== "playing" || state.busy || !state.player) return;
+  if (!state.run || state.run.status !== "playing" || state.busy || !state.player || !state.clockLive) return;
   const elapsed = Math.round(shownElapsed());
   try {
     const data = await api(`/api/runs/${state.run.id}/clock`, {
@@ -981,7 +1023,7 @@ setInterval(() => {
 }, 8000);
 
 window.addEventListener("pagehide", () => {
-  if (!state.run || !state.player || state.run.status !== "playing") return;
+  if (!state.run || !state.player || state.run.status !== "playing" || !state.clockLive) return;
   const payload = JSON.stringify({
     player_id: state.player.id,
     elapsed_ms: Math.round(shownElapsed()),
@@ -992,6 +1034,10 @@ window.addEventListener("pagehide", () => {
       new Blob([payload], { type: "application/json" }),
     );
   }
+});
+
+window.addEventListener("resize", () => {
+  if (state.screen === "play") sizeBoard();
 });
 
 boot();
