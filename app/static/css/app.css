@@ -157,6 +157,7 @@ body.playing #app {
 
 .choice strong, .section-title { font-size: 1.05rem; }
 .choice span, .fine { color: var(--muted); font-size: 0.92rem; }
+.blurb { margin: 0 0 10px; line-height: 1.35; }
 
 .section-title {
   margin: 18px 0 8px;
@@ -194,6 +195,7 @@ body.playing #app {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+  margin-top: 10px;
 }
 
 .level-grid button {
