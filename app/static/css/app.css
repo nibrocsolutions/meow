@@ -330,16 +330,16 @@ body.playing #app {
   filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.12));
 }
 .cell.fresh-mark .mark-x { animation: pop 0.12s ease-out; }
-.dot {
-  width: 12%;
-  height: 12%;
-  border-radius: 50%;
-  background: rgba(42, 36, 64, 0.38);
+.cell.ruled[data-kind="empty"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.34);
+  pointer-events: none;
 }
 @media (prefers-color-scheme: dark) {
-  .dot { background: rgba(255, 255, 255, 0.55); }
+  .cell.ruled[data-kind="empty"]::after { background: rgba(0, 0, 0, 0.28); }
 }
-.cell.ruled .dot { opacity: 0.4; }
 
 @keyframes pop {
   from { transform: scale(0.55); }

@@ -200,7 +200,15 @@ def get_run(db: Session, run_id: int, player_id: int) -> dict:
     return _public(db, run, puzzle)
 
 
-def tap(db: Session, run_id: int, player_id: int, row: int, col: int, elapsed_ms: int | None) -> dict:
+def tap(
+    db: Session,
+    run_id: int,
+    player_id: int,
+    row: int,
+    col: int,
+    elapsed_ms: int | None,
+    intent: str | None = None,
+) -> dict:
     run, puzzle = _own(db, run_id, player_id)
     if run.status != "playing":
         return _public(db, run, puzzle)
@@ -210,21 +218,37 @@ def tap(db: Session, run_id: int, player_id: int, row: int, col: int, elapsed_ms
     cats = _pairs(run.cats)
     marks = _pairs(run.marks)
     cell = (row, col)
-    if cell in starters:
+    if cell in starters or cell in cats:
         db.commit()
         return _public(db, run, puzzle)
-    _push(run)
+    if intent is None:
+        intent = "clear" if cell in marks else "mark"
+    if intent not in {"mark", "clear", "cat"}:
+        raise GameError("Unknown tap.")
     lost_heart = False
     message = None
-    if cell in cats:
-        cats = [item for item in cats if tuple(item) != cell]
-    elif cell in marks:
+    changed = False
+    if intent == "mark":
+        if cell not in marks:
+            _push(run)
+            marks.append(cell)
+            changed = True
+    elif intent == "clear":
+        if cell in marks:
+            _push(run)
+            marks = [item for item in marks if tuple(item) != cell]
+            changed = True
+    else:
+        _push(run)
+        changed = True
         solution = _solution_cells(puzzle)
         if cell in solution:
             marks = [item for item in marks if tuple(item) != cell]
             cats.append(cell)
         else:
             lost_heart = True
+            if cell not in marks:
+                marks.append(cell)
             occupied = set(starters) | {tuple(item) for item in cats}
             message = rejection_reason(puzzle.size, json.loads(puzzle.regions), occupied, row, col)
             run.hearts = max(0, run.hearts - 1)
@@ -232,8 +256,9 @@ def tap(db: Session, run_id: int, player_id: int, row: int, col: int, elapsed_ms
             if run.hearts == 0:
                 run.status = "lost"
                 run.finished_at = utcnow()
-    else:
-        marks.append((row, col))
+    if not changed:
+        db.commit()
+        return _public(db, run, puzzle)
     run.cats = _dump_pairs(cats)
     run.marks = _dump_pairs(marks)
     just_won = False
