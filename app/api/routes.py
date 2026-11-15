@@ -40,6 +40,7 @@ class TapBody(BaseModel):
     row: int
     col: int
     elapsed_ms: int | None = None
+    intent: str | None = None
 
 
 class MarksBody(BaseModel):
@@ -117,7 +118,9 @@ def read_run(run_id: int, player_id: int, db: Session = Depends(get_db)) -> dict
 
 @router.post("/runs/{run_id}/tap")
 def post_tap(run_id: int, body: TapBody, db: Session = Depends(get_db)) -> dict:
-    return _call(lambda: tap(db, run_id, body.player_id, body.row, body.col, body.elapsed_ms))
+    return _call(
+        lambda: tap(db, run_id, body.player_id, body.row, body.col, body.elapsed_ms, body.intent)
+    )
 
 
 @router.post("/runs/{run_id}/marks")

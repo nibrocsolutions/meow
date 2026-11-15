@@ -35,7 +35,7 @@ docker compose down
 - Play a campaign. Early levels are 5×5 with one given cat. Later levels grow to 9×9
 - Play today's easy, normal, and hard boards. The date follows the Pi's `DAILY_TZ` (Eastern Time by default) and the board is the same for everyone in the house
 - Play endless puzzles at four sizes
-- Tap a cell to mark it empty, tap again to try a cat, and drag to mark a line
+- Tap a cell for an X, tap the X to remove it, and double-tap to try a cat. Slide to mark a path, and keep going around corners until you lift your finger
 - Lose a heart for a wrong cat. Three hearts end the attempt. Restart keeps the same board
 - Ask for a hint. It explains the next forced step and does not cost a heart
 - Undo a tap, a drag, or a hint
@@ -75,8 +75,8 @@ pytest
 | GET | `/api/home?player_id=` | Campaign, daily boards, streak, stats |
 | POST | `/api/runs` | Start or resume a campaign level, a daily, or an endless board |
 | GET | `/api/runs/{id}?player_id=` | The board, without the solution |
-| POST | `/api/runs/{id}/tap` | Cycle empty → mark → cat |
-| POST | `/api/runs/{id}/marks` | Mark the cells from a drag |
+| POST | `/api/runs/{id}/tap` | `intent` mark, clear, or cat |
+| POST | `/api/runs/{id}/marks` | Mark the cells from a slide |
 | POST | `/api/runs/{id}/undo` | Take back the last change |
 | POST | `/api/runs/{id}/restart` | Hearts and marks back to the start |
 | POST | `/api/runs/{id}/hint` | Explain and apply the next forced step |

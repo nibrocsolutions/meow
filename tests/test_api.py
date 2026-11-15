@@ -78,9 +78,19 @@ def test_campaign_play_hearts_hint_and_win(client):
     )
     assert marked.status_code == 200
     assert marked.json()["marks"] == [[wrong[0], wrong[1]]]
+    cleared = client.post(
+        f"/api/runs/{run['id']}/tap",
+        json={"player_id": player["id"], "row": wrong[0], "col": wrong[1], "elapsed_ms": 1100, "intent": "clear"},
+    )
+    assert cleared.json()["marks"] == []
+    assert cleared.json()["hearts"] == 3
+    client.post(
+        f"/api/runs/{run['id']}/tap",
+        json={"player_id": player["id"], "row": wrong[0], "col": wrong[1], "elapsed_ms": 1150, "intent": "mark"},
+    )
     missed = client.post(
         f"/api/runs/{run['id']}/tap",
-        json={"player_id": player["id"], "row": wrong[0], "col": wrong[1], "elapsed_ms": 1200},
+        json={"player_id": player["id"], "row": wrong[0], "col": wrong[1], "elapsed_ms": 1200, "intent": "cat"},
     )
     assert missed.json()["hearts"] == 2
     assert missed.json()["lost_heart"] is True
@@ -164,7 +174,7 @@ def test_daily_is_stable_and_counts_toward_the_streak(client):
         )
         placed = client.post(
             f"/api/runs/{current['id']}/tap",
-            json={"player_id": player["id"], "row": row, "col": col, "elapsed_ms": 200},
+            json={"player_id": player["id"], "row": row, "col": col, "elapsed_ms": 200, "intent": "cat"},
         )
         current = placed.json()
     assert current["status"] == "won"

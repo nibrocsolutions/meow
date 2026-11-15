@@ -417,10 +417,10 @@ function helpScreen() {
         <li>Every column has exactly one cat.</li>
         <li>Two cats cannot touch, not even on a corner.</li>
       </ol>
-      <p>Tap a cell to mark it with an X. Tap the X to try a cat. A wrong cat costs a heart. You have three. Slide along a row or down a column and the X marks follow your finger.</p>
-      <p>A resting cat is given. It does not move. Shaded dots are cells the cats you already placed have ruled out.</p>
-      <p>Hints explain the next forced step. They do not cost a heart. Undo takes back a tap, a drag, or a hint.</p>
-      <p>On a keyboard, arrows move, space cycles a cell, <kbd>Z</kbd> undoes, and <kbd>H</kbd> hints.</p>
+      <p>Tap a cell to mark it with an X. Tap an X once to remove it. Double-tap a cell to try a cat. A wrong cat costs a heart. You have three. Slide to lay down X's, and you can turn and keep going until you lift your finger.</p>
+      <p>A resting cat is given. It does not move. Shaded cells are the ones the cats you already placed have ruled out.</p>
+      <p>Hints explain the next forced step. They do not cost a heart. Undo takes back a tap, a slide, or a hint.</p>
+      <p>On a keyboard, arrows move, space marks or clears a cell, a quick second space tries a cat, <kbd>Z</kbd> undoes, and <kbd>H</kbd> hints.</p>
       <p class="fine">Same rules as Meowdoku. This copy runs on your Pi for the phones in the house. It is not the official app.</p>
     </div>
   `;
@@ -449,7 +449,7 @@ function playScreen() {
     <div class="hint-row">
       ${catSvg(false)}
       <div class="bubble">
-        <p class="hint" aria-live="polite">${esc(state.hint || "Tap for an X. Slide along a row or column and the X's follow your finger.")}</p>
+        <p class="hint" aria-live="polite">${esc(state.hint || "Tap for an X. Tap an X to remove it. Double-tap for a cat. Slide, and turn, until you lift your finger.")}</p>
         <p class="toast" aria-live="assertive">${esc(state.toast || "")}</p>
       </div>
     </div>
@@ -476,7 +476,7 @@ function boardHtml(run) {
       const region = run.regions[row * run.size + col];
       const name = COLOR_NAMES[region] || "color";
       let kind = "empty";
-      let inner = `<span class="dot"></span>`;
+      let inner = "";
       if (starters.has(key)) {
         kind = "given";
         inner = catSvg(true);
@@ -878,6 +878,8 @@ document.addEventListener("input", (event) => {
 });
 
 let gesture = null;
+let pendingTap = null;
+const TAP_MS = 320;
 
 function cellFromPoint(x, y) {
   const board = document.querySelector(".board");
@@ -915,24 +917,113 @@ function showSlideMark(row, col, on) {
   }
   cell.classList.remove("fresh-mark");
   cell.dataset.kind = "empty";
-  cell.innerHTML = `<span class="dot"></span>`;
+  cell.innerHTML = "";
   return true;
 }
 
-function applySlideSpan(span) {
-  for (const key of [...gesture.added]) {
-    if (span.has(key)) continue;
-    const [row, col] = key.split(",").map(Number);
+function paintCell(row, col) {
+  const cell = cellButton(row, col);
+  if (!cell || cell.dataset.kind === "cat" || cell.dataset.kind === "given") return false;
+  if (cell.dataset.kind === "mark") return cell.classList.contains("fresh-mark") ? "have" : false;
+  return showSlideMark(row, col, true) ? true : false;
+}
+
+function orthogonalPath(from, to, axis) {
+  const cells = [];
+  const pushLine = (start, end) => {
+    if (start.row === end.row) {
+      const step = start.col <= end.col ? 1 : -1;
+      for (let col = start.col + step; step > 0 ? col <= end.col : col >= end.col; col += step) {
+        cells.push({ row: start.row, col });
+      }
+    } else if (start.col === end.col) {
+      const step = start.row <= end.row ? 1 : -1;
+      for (let row = start.row + step; step > 0 ? row <= end.row : row >= end.row; row += step) {
+        cells.push({ row, col: start.col });
+      }
+    }
+  };
+  if (from.row === to.row || from.col === to.col) {
+    pushLine(from, to);
+    return cells;
+  }
+  const corner = axis === "row" ? { row: from.row, col: to.col } : { row: to.row, col: from.col };
+  pushLine(from, corner);
+  pushLine(corner, to);
+  return cells;
+}
+
+function extendStroke(hit) {
+  const tip = gesture.stroke[gesture.stroke.length - 1];
+  const cells = orthogonalPath(tip, hit, gesture.axis);
+  for (const next of cells) {
+    const current = gesture.stroke[gesture.stroke.length - 1];
+    const prev = gesture.stroke[gesture.stroke.length - 2];
+    if (prev && prev.row === next.row && prev.col === next.col) {
+      if (current.added) showSlideMark(current.row, current.col, false);
+      gesture.stroke.pop();
+      continue;
+    }
+    if (gesture.stroke.some((item) => item.row === next.row && item.col === next.col)) continue;
+    const painted = paintCell(next.row, next.col);
+    gesture.stroke.push({ row: next.row, col: next.col, added: painted === true });
+  }
+  const before = gesture.stroke[gesture.stroke.length - 2];
+  const after = gesture.stroke[gesture.stroke.length - 1];
+  if (before && after && (before.row === after.row || before.col === after.col)) {
+    gesture.axis = before.row === after.row ? "row" : "col";
+  }
+}
+
+function takePending() {
+  if (!pendingTap) return null;
+  clearTimeout(pendingTap.timer);
+  const pending = pendingTap;
+  pendingTap = null;
+  return pending;
+}
+
+async function sendPending(pending) {
+  if (!pending || !state.run) return;
+  if (pending.kind === "clear") {
+    state.pendingCell = [pending.row, pending.col];
+    await act(`/api/runs/${state.run.id}/tap`, {
+      row: pending.row,
+      col: pending.col,
+      intent: "clear",
+    });
+    return;
+  }
+  await act(`/api/runs/${state.run.id}/marks`, { cells: [[pending.row, pending.col]] });
+}
+
+async function scheduleTap(row, col) {
+  const cell = cellButton(row, col);
+  if (!cell || !state.run || state.run.status !== "playing") return;
+  state.cursor = { row, col };
+  if (cell.dataset.kind === "given" || cell.dataset.kind === "cat") return;
+  if (pendingTap && pendingTap.row === row && pendingTap.col === col) {
+    takePending();
+    state.pendingCell = [row, col];
+    await act(`/api/runs/${state.run.id}/tap`, { row, col, intent: "cat" });
+    return;
+  }
+  if (pendingTap) await sendPending(takePending());
+  const fresh = cellButton(row, col);
+  if (!fresh || fresh.dataset.kind === "given" || fresh.dataset.kind === "cat") return;
+  if (fresh.dataset.kind === "mark") {
     showSlideMark(row, col, false);
-    gesture.added.delete(key);
+    pendingTap = { row, col, kind: "clear" };
+  } else {
+    showSlideMark(row, col, true);
+    pendingTap = { row, col, kind: "mark" };
   }
-  for (const key of span) {
-    if (gesture.added.has(key)) continue;
-    const [row, col] = key.split(",").map(Number);
-    const cell = cellButton(row, col);
-    if (!cell || cell.dataset.kind === "cat" || cell.dataset.kind === "given" || cell.dataset.kind === "mark") continue;
-    if (showSlideMark(row, col, true)) gesture.added.add(key);
-  }
+  pendingTap.timer = setTimeout(() => {
+    if (!pendingTap || pendingTap.row !== row || pendingTap.col !== col || gesture) return;
+    const due = pendingTap;
+    pendingTap = null;
+    void sendPending(due);
+  }, TAP_MS);
 }
 
 document.addEventListener("pointerdown", (event) => {
@@ -940,16 +1031,25 @@ document.addEventListener("pointerdown", (event) => {
   if (!cell || state.screen !== "play" || !state.run || state.run.status !== "playing" || state.busy) return;
   if (event.button !== 0) return;
   event.preventDefault();
-  if (cell.setPointerCapture) cell.setPointerCapture(event.pointerId);
+  if (cell.setPointerCapture) {
+    try { cell.setPointerCapture(event.pointerId); } catch { /* The pointer can already be gone. */ }
+  }
+  const row = Number(cell.dataset.r);
+  const col = Number(cell.dataset.c);
+  let carry = null;
+  if (pendingTap && (pendingTap.row !== row || pendingTap.col !== col)) {
+    carry = takePending();
+  }
   gesture = {
-    row: Number(cell.dataset.r),
-    col: Number(cell.dataset.c),
+    row,
+    col,
     axis: null,
     moved: false,
-    added: new Set(),
+    stroke: [{ row, col, added: false }],
     pointer: event.pointerId,
     x: event.clientX,
     y: event.clientY,
+    carry,
   };
 });
 
@@ -963,18 +1063,14 @@ document.addEventListener("pointermove", (event) => {
     if (Math.hypot(dx, dy) < 12) return;
     gesture.axis = Math.abs(dx) >= Math.abs(dy) ? "row" : "col";
     gesture.moved = true;
+    if (pendingTap && pendingTap.row === gesture.row && pendingTap.col === gesture.col) {
+      gesture.stroke[0].added = pendingTap.kind === "mark";
+      takePending();
+    }
+    if (paintCell(gesture.row, gesture.col) === true) gesture.stroke[0].added = true;
   }
-  const span = new Set();
-  if (gesture.axis === "row") {
-    const start = Math.min(gesture.col, hit.col);
-    const end = Math.max(gesture.col, hit.col);
-    for (let col = start; col <= end; col += 1) span.add(`${gesture.row},${col}`);
-  } else {
-    const start = Math.min(gesture.row, hit.row);
-    const end = Math.max(gesture.row, hit.row);
-    for (let row = start; row <= end; row += 1) span.add(`${row},${gesture.col}`);
-  }
-  applySlideSpan(span);
+  if (hit.row === gesture.stroke[gesture.stroke.length - 1].row && hit.col === gesture.stroke[gesture.stroke.length - 1].col) return;
+  extendStroke(hit);
 });
 
 async function finishGesture(event) {
@@ -983,23 +1079,25 @@ async function finishGesture(event) {
   gesture = null;
   if (!state.run) return;
   if (done.moved) {
-    if (done.added.size === 0) return;
-    const cells = [...done.added].map((key) => key.split(",").map(Number));
+    if (done.carry) await sendPending(done.carry);
+    const cells = done.stroke.filter((item) => item.added).map((item) => [item.row, item.col]);
+    if (cells.length === 0) return;
     await act(`/api/runs/${state.run.id}/marks`, { cells });
     return;
   }
-  state.pendingCell = [done.row, done.col];
+  if (done.carry) await sendPending(done.carry);
   state.cursor = { row: done.row, col: done.col };
-  await act(`/api/runs/${state.run.id}/tap`, { row: done.row, col: done.col });
+  await scheduleTap(done.row, done.col);
 }
 
 function cancelGesture() {
   if (!gesture) return;
-  for (const key of gesture.added) {
-    const [row, col] = key.split(",").map(Number);
-    showSlideMark(row, col, false);
-  }
+  const done = gesture;
   gesture = null;
+  for (const item of done.stroke) {
+    if (item.added) showSlideMark(item.row, item.col, false);
+  }
+  if (done.carry) void sendPending(done.carry);
 }
 
 document.addEventListener("pointerup", finishGesture);
@@ -1022,8 +1120,7 @@ document.addEventListener("keydown", async (event) => {
   else if (key === "arrowright") state.cursor.col = Math.min(state.run.size - 1, state.cursor.col + 1);
   else if (key === " " || key === "enter") {
     event.preventDefault();
-    state.pendingCell = [state.cursor.row, state.cursor.col];
-    await act(`/api/runs/${state.run.id}/tap`, { row: state.cursor.row, col: state.cursor.col });
+    await scheduleTap(state.cursor.row, state.cursor.col);
     return;
   } else if (key === "z") {
     await act(`/api/runs/${state.run.id}/undo`);
